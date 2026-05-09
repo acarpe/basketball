@@ -146,6 +146,7 @@
         <div id="players-list" class="players-list" aria-live="polite"></div>
 
         <div class="row gap mt">
+          <button class="btn ghost" id="btn-summary">Riepilogo</button>
           <button class="btn ghost" id="btn-export">Esporta JSON</button>
         </div>
 
@@ -161,6 +162,22 @@
       </header>
       <div class="container">
         <div id="history-list" class="history-list"></div>
+      </div>
+    </section>
+
+    <!-- ============== SUMMARY SCREEN ============== -->
+    <section id="screen-summary" class="screen hidden">
+      <header class="topbar no-print">
+        <button class="btn ghost xsmall" id="btn-summary-back">&lsaquo; Indietro</button>
+        <h1>Riepilogo</h1>
+      </header>
+      <div class="container">
+        <div class="row gap no-print summary-actions">
+          <button class="btn primary" id="btn-print">Stampa / PDF</button>
+          <button class="btn ghost" id="btn-png">Salva PNG</button>
+        </div>
+        <p class="status no-print" id="png-status" aria-live="polite"></p>
+        <div id="summary-sheet" class="summary-sheet"></div>
       </div>
     </section>
 
@@ -194,6 +211,7 @@
 
   </main>
 
-  <script src="app.js"></script>
+  <script src="vendor/html2canvas.min.js" defer></script>
+  <script src="app.js" defer></script>
 </body>
 </html>

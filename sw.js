@@ -1,6 +1,6 @@
 // Service worker for offline-capable PWA. Cache-first per gli asset locali,
 // network-first con fallback per HTML.
-const CACHE = 'uisp-referto-v2';
+const CACHE = 'uisp-referto-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './manifest.webmanifest',
   './icon.svg',
   './icon-maskable.svg',
+  './vendor/html2canvas.min.js',
 ];
 
 self.addEventListener('install', (event) => {

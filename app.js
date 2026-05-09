@@ -698,6 +698,177 @@
   }
 
   // ============================================================
+  // SUMMARY (printable / PNG-able)
+  // ============================================================
+  function renderSummary() {
+    const sheet = document.getElementById('summary-sheet');
+    if (!state.match) { sheet.innerHTML = ''; return; }
+    const m = state.match;
+    const home = colorById(m.home.color || DEFAULT_HOME_COLOR);
+    const away = colorById(m.away.color || DEFAULT_AWAY_COLOR);
+
+    // Per-period scores
+    const periodScores = { home: [0,0,0,0], away: [0,0,0,0] };
+    const periodTeamFouls = { home: [0,0,0,0], away: [0,0,0,0] };
+    for (const ev of m.events) {
+      const idx = (ev.period || 1) - 1;
+      if (idx < 0 || idx > 3) continue;
+      if (ev.type === 'score') periodScores[ev.team][idx] += ev.value;
+      if (ev.type === 'foul' || ev.type === 'team_foul') periodTeamFouls[ev.team][idx]++;
+    }
+    const totals = {
+      home: periodScores.home.reduce((s, v) => s + v, 0),
+      away: periodScores.away.reduce((s, v) => s + v, 0),
+    };
+
+    const dateStr = new Date().toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' });
+
+    const renderTeamTable = (side) => {
+      const team = m[side];
+      const accent = side === 'home' ? home : away;
+      const players = team.players.slice().sort((a, b) => a.number - b.number);
+      let teamPts = 0, teamTL = 0, team2 = 0, team3 = 0, teamFouls = 0;
+      const rows = players.map((p) => {
+        const st = getPlayerStats(side, p.number);
+        teamPts += st.pts; teamTL += st.tl; team2 += st.p2; team3 += st.p3; teamFouls += st.fouls;
+        const out = st.fouls >= FOULS_OUT;
+        return `<tr class="${out ? 'fouled-out' : ''}">
+          <td class="num">${p.number}</td>
+          <td class="name">${escapeHtml(p.lastName)}${p.firstName ? ' <span class="muted-small" style="color:#888;font-weight:400">' + escapeHtml(p.firstName) + '</span>' : ''}</td>
+          <td>${st.tl || '-'}</td>
+          <td>${st.p2 || '-'}</td>
+          <td>${st.p3 || '-'}</td>
+          <td><strong>${st.pts}</strong></td>
+          <td>${st.fouls || '-'}</td>
+        </tr>`;
+      }).join('');
+
+      const totalTeamFoulsAllPeriods = periodTeamFouls[side].reduce((s, v) => s + v, 0);
+      const timeouts = getTimeouts(side);
+
+      return `
+        <div class="team-block ${side}">
+          <div class="team-title" style="color:${accent.color}">
+            ${escapeHtml(team.name)}
+            <span class="pts">${totals[side]} pt</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th style="text-align:left">Giocatore</th>
+                <th>TL</th>
+                <th>2P</th>
+                <th>3P</th>
+                <th>PTI</th>
+                <th>F</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+              <tr class="totals">
+                <td></td>
+                <td class="name">Totali</td>
+                <td>${teamTL}</td>
+                <td>${team2}</td>
+                <td>${team3}</td>
+                <td>${teamPts}</td>
+                <td>${teamFouls}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="small-info">
+            Timeout: <strong>${timeouts}</strong> ·
+            Falli sq. per quarto: ${periodTeamFouls[side].map((v, i) => `Q${i+1} ${v}`).join(' · ')}
+            (tot ${totalTeamFoulsAllPeriods})
+            ${team.coach ? ' · All. ' + escapeHtml(team.coach.lastName) : ''}
+          </div>
+        </div>
+      `;
+    };
+
+    sheet.style.setProperty('--home', home.color);
+    sheet.style.setProperty('--away', away.color);
+
+    sheet.innerHTML = `
+      <h2>Referto UISP</h2>
+      <div class="sub">${escapeHtml(dateStr)}</div>
+
+      <div class="final-score">
+        <div class="home">
+          <div class="ts-name">${escapeHtml(m.home.name)}</div>
+          <div class="ts-score" style="color:${home.color}">${totals.home}</div>
+        </div>
+        <div class="vs">–</div>
+        <div class="away">
+          <div class="ts-name">${escapeHtml(m.away.name)}</div>
+          <div class="ts-score" style="color:${away.color}">${totals.away}</div>
+        </div>
+      </div>
+
+      <div class="periods">
+        <div class="row-h team">Squadra</div>
+        <div class="row-h">Q1</div><div class="row-h">Q2</div><div class="row-h">Q3</div><div class="row-h">Q4</div>
+        <div class="row-h">Tot</div>
+
+        <div class="label home">${escapeHtml(m.home.name)}</div>
+        ${periodScores.home.map((v) => `<div>${v}</div>`).join('')}
+        <div class="row-tot">${totals.home}</div>
+
+        <div class="label away">${escapeHtml(m.away.name)}</div>
+        ${periodScores.away.map((v) => `<div>${v}</div>`).join('')}
+        <div class="row-tot">${totals.away}</div>
+      </div>
+
+      ${renderTeamTable('home')}
+      ${renderTeamTable('away')}
+    `;
+  }
+
+  function printSummary() {
+    window.print();
+  }
+
+  async function saveSummaryPng() {
+    const status = document.getElementById('png-status');
+    if (typeof window.html2canvas !== 'function') {
+      status.textContent = 'Libreria immagine non caricata. Riprova.';
+      status.className = 'status error';
+      return;
+    }
+    const sheet = document.getElementById('summary-sheet');
+    if (!sheet || !state.match) return;
+    status.textContent = 'Generazione immagine…';
+    status.className = 'status info';
+    try {
+      const canvas = await window.html2canvas(sheet, {
+        backgroundColor: '#ffffff',
+        scale: Math.min(window.devicePixelRatio || 1, 2),
+        useCORS: true,
+        logging: false,
+      });
+      canvas.toBlob((blob) => {
+        if (!blob) { status.textContent = 'Errore generazione immagine.'; status.className = 'status error'; return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const date = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `referto-${safeFilenamePart(state.match.home.name)}-vs-${safeFilenamePart(state.match.away.name)}-${date}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        status.textContent = 'Immagine salvata.';
+        status.className = 'status success';
+      }, 'image/png');
+    } catch (e) {
+      console.error(e);
+      status.textContent = 'Errore: ' + e.message;
+      status.className = 'status error';
+    }
+  }
+
+  // ============================================================
   // EXPORT / IMPORT
   // ============================================================
   function buildExportPayload(match) {
@@ -935,6 +1106,19 @@
     document.getElementById('btn-export').addEventListener('click', () => {
       if (state.match) exportMatch(state.match);
     });
+
+    document.getElementById('btn-summary').addEventListener('click', () => {
+      renderSummary();
+      showScreen('summary');
+    });
+
+    // --- Summary ---
+    document.getElementById('btn-summary-back').addEventListener('click', () => {
+      showScreen('match');
+      renderMatch();
+    });
+    document.getElementById('btn-print').addEventListener('click', printSummary);
+    document.getElementById('btn-png').addEventListener('click', saveSummaryPng);
 
     // --- History ---
     document.getElementById('btn-history-back').addEventListener('click', () => {
