@@ -147,18 +147,23 @@ code {
 }
 .preview-team .pill .num { color: var(--primary); font-weight: 700; margin-right: 6px; }
 
+/* ====== Match header (scoreboard + tabs sticky together) ====== */
+.match-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
 /* ====== Scoreboard ====== */
 .scoreboard {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: 8px;
   background: var(--surface);
-  border-bottom: 1px solid var(--border);
   padding: 12px 10px;
   align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 5;
 }
 .team-score { text-align: center; min-width: 0; }
 .team-score[data-team="home"] { color: var(--text); }
@@ -200,10 +205,7 @@ code {
   display: grid;
   grid-template-columns: 1fr 1fr;
   background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 4;
+  border-top: 1px solid var(--border);
 }
 .tab {
   appearance: none;

@@ -82,35 +82,37 @@
 
     <!-- ============== MATCH SCREEN ============== -->
     <section id="screen-match" class="screen hidden">
-      <header class="scoreboard">
-        <div class="team-score" data-team="home">
-          <div class="team-name" id="sb-home-name">Casa</div>
-          <div class="score" id="sb-home-score">0</div>
-          <div class="meta">
-            <span class="bonus-pill" id="sb-home-bonus">Falli sq. 0</span>
-            <span class="to-pill" id="sb-home-to">TO 0</span>
+      <div class="match-header">
+        <header class="scoreboard">
+          <div class="team-score" data-team="home">
+            <div class="team-name" id="sb-home-name">Casa</div>
+            <div class="score" id="sb-home-score">0</div>
+            <div class="meta">
+              <span class="bonus-pill" id="sb-home-bonus">Falli sq. 0</span>
+              <span class="to-pill" id="sb-home-to">TO 0</span>
+            </div>
           </div>
-        </div>
-        <div class="period">
-          <div class="period-label">QUARTO</div>
-          <div class="period-value" id="sb-period">1</div>
-          <button class="btn ghost xsmall" id="btn-period-prev" aria-label="Quarto precedente">&lsaquo;</button>
-          <button class="btn ghost xsmall" id="btn-period-next" aria-label="Quarto successivo">&rsaquo;</button>
-        </div>
-        <div class="team-score" data-team="away">
-          <div class="team-name" id="sb-away-name">Ospite</div>
-          <div class="score" id="sb-away-score">0</div>
-          <div class="meta">
-            <span class="bonus-pill" id="sb-away-bonus">Falli sq. 0</span>
-            <span class="to-pill" id="sb-away-to">TO 0</span>
+          <div class="period">
+            <div class="period-label">QUARTO</div>
+            <div class="period-value" id="sb-period">1</div>
+            <button class="btn ghost xsmall" id="btn-period-prev" aria-label="Quarto precedente">&lsaquo;</button>
+            <button class="btn ghost xsmall" id="btn-period-next" aria-label="Quarto successivo">&rsaquo;</button>
           </div>
-        </div>
-      </header>
+          <div class="team-score" data-team="away">
+            <div class="team-name" id="sb-away-name">Ospite</div>
+            <div class="score" id="sb-away-score">0</div>
+            <div class="meta">
+              <span class="bonus-pill" id="sb-away-bonus">Falli sq. 0</span>
+              <span class="to-pill" id="sb-away-to">TO 0</span>
+            </div>
+          </div>
+        </header>
 
-      <nav class="tabs" role="tablist">
-        <button class="tab active" data-tab="home" role="tab">Casa</button>
-        <button class="tab" data-tab="away" role="tab">Ospite</button>
-      </nav>
+        <nav class="tabs" role="tablist">
+          <button class="tab active" data-tab="home" role="tab">Casa</button>
+          <button class="tab" data-tab="away" role="tab">Ospite</button>
+        </nav>
+      </div>
 
       <div class="container">
         <div class="row gap actions-row">
