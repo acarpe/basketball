@@ -21,6 +21,7 @@
   let currentTab = 'home';
   let pendingRoster = null;   // parsed roster awaiting confirmation
   let modalPlayer = null;     // {team, number}
+  let editingEventId = null;  // id of event currently being edited
 
   function loadState() {
     try {
@@ -462,19 +463,129 @@
         badgeText = 'Timeout';
         desc = 'Sospensione';
       }
+      const canEdit = ev.type === 'score' || ev.type === 'foul';
       item.innerHTML = `
         <span class="badge ${ev.type}">${escapeHtml(badgeText)}</span>
         <div class="desc">
           <div class="team ${ev.team}">${escapeHtml(teamLabel)} · Q${ev.period}</div>
           <div>${escapeHtml(desc)}</div>
         </div>
-        <button class="delete" data-id="${ev.id}" aria-label="Elimina">Elimina</button>
+        <div class="actions">
+          ${canEdit ? `<button class="edit" data-id="${ev.id}">Modifica</button>` : ''}
+          <button class="delete" data-id="${ev.id}">Elimina</button>
+        </div>
       `;
+      const editBtn = item.querySelector('.edit');
+      if (editBtn) editBtn.addEventListener('click', () => openEditEvent(ev.id));
       item.querySelector('.delete').addEventListener('click', () => {
         if (confirm('Eliminare questo evento?')) removeEvent(ev.id);
       });
       list.appendChild(item);
     }
+  }
+
+  // ----- EDIT EVENT -----
+  function openEditEvent(id) {
+    const ev = state.match.events.find((e) => e.id === id);
+    if (!ev) return;
+    if (ev.type !== 'score' && ev.type !== 'foul') return;
+    editingEventId = id;
+    renderEditModal();
+    document.getElementById('modal-edit').classList.remove('hidden');
+  }
+
+  function closeEditModal() {
+    editingEventId = null;
+    document.getElementById('modal-edit').classList.add('hidden');
+  }
+
+  function updateEditedEvent(patch) {
+    const ev = state.match.events.find((e) => e.id === editingEventId);
+    if (!ev) return;
+    Object.assign(ev, patch);
+    saveState();
+    renderEditModal();
+    renderHistory();
+    renderMatch();
+  }
+
+  function renderEditModal() {
+    const ev = state.match.events.find((e) => e.id === editingEventId);
+    if (!ev) return;
+    document.getElementById('edit-title').textContent =
+      ev.type === 'score' ? 'Modifica canestro' : 'Modifica fallo';
+
+    const body = document.getElementById('edit-body');
+    const teamObj = state.match[ev.team];
+    const players = teamObj.players.slice().sort((a, b) => a.number - b.number);
+
+    let html = '';
+
+    // Team switcher
+    html += '<div class="edit-section">';
+    html += '<div class="edit-label">Squadra</div>';
+    html += '<div class="edit-pills">';
+    ['home', 'away'].forEach((t) => {
+      const cls = t === ev.team ? 'pill-btn active' : 'pill-btn';
+      html += `<button class="${cls}" data-edit-team="${t}">${escapeHtml(state.match[t].name)}</button>`;
+    });
+    html += '</div></div>';
+
+    // Period switcher
+    html += '<div class="edit-section">';
+    html += '<div class="edit-label">Quarto</div>';
+    html += '<div class="edit-pills">';
+    for (let p = 1; p <= MAX_PERIODS; p++) {
+      const cls = p === ev.period ? 'pill-btn active' : 'pill-btn';
+      html += `<button class="${cls}" data-edit-period="${p}">Q${p}</button>`;
+    }
+    html += '</div></div>';
+
+    // Value (score only)
+    if (ev.type === 'score') {
+      html += '<div class="edit-section">';
+      html += '<div class="edit-label">Valore</div>';
+      html += '<div class="edit-pills">';
+      [1, 2, 3].forEach((v) => {
+        const cls = v === ev.value ? 'pill-btn active' : 'pill-btn';
+        const label = v === 1 ? 'TL +1' : `+${v}`;
+        html += `<button class="${cls}" data-edit-value="${v}">${label}</button>`;
+      });
+      html += '</div></div>';
+    }
+
+    // Player picker
+    html += '<div class="edit-section">';
+    html += '<div class="edit-label">Giocatore</div>';
+    if (players.length === 0) {
+      html += '<div class="muted small">Nessun giocatore in questa squadra.</div>';
+    } else {
+      html += '<div class="edit-players">';
+      players.forEach((p) => {
+        const cls = p.number === ev.number ? 'player-pick active' : 'player-pick';
+        html += `<button class="${cls}" data-edit-player="${p.number}">
+          <span class="num">${p.number}</span>
+          <span class="name">${escapeHtml(p.lastName)}</span>
+        </button>`;
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+
+    body.innerHTML = html;
+
+    body.querySelectorAll('[data-edit-team]').forEach((b) => {
+      b.addEventListener('click', () => updateEditedEvent({ team: b.dataset.editTeam }));
+    });
+    body.querySelectorAll('[data-edit-period]').forEach((b) => {
+      b.addEventListener('click', () => updateEditedEvent({ period: parseInt(b.dataset.editPeriod, 10) }));
+    });
+    body.querySelectorAll('[data-edit-value]').forEach((b) => {
+      b.addEventListener('click', () => updateEditedEvent({ value: parseInt(b.dataset.editValue, 10) }));
+    });
+    body.querySelectorAll('[data-edit-player]').forEach((b) => {
+      b.addEventListener('click', () => updateEditedEvent({ number: parseInt(b.dataset.editPlayer, 10) }));
+    });
   }
 
   // ============================================================
@@ -617,6 +728,12 @@
       btn.addEventListener('click', () => {
         handleModalAction(btn.dataset.action, btn.dataset.value);
       });
+    });
+
+    // --- Edit modal ---
+    document.getElementById('edit-close').addEventListener('click', closeEditModal);
+    document.getElementById('modal-edit').addEventListener('click', (e) => {
+      if (e.target.id === 'modal-edit') closeEditModal();
     });
   }
 
