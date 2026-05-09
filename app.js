@@ -5,6 +5,7 @@
   'use strict';
 
   const STORAGE_KEY = 'uisp-referto-v1';
+  const RECENT_KEY = 'uisp-referto-recent-v1';
   const MAX_PERIODS = 4;
   const FOULS_BONUS = 5;            // 5° fallo squadra in periodo => bonus
   const FOULS_OUT = 5;              // 5° fallo individuale => fuori
@@ -12,6 +13,18 @@
     (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
     (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   ];
+  const PALETTE = [
+    { id: 'blue',   color: '#3b82f6', text: '#ffffff', label: 'Blu' },
+    { id: 'red',    color: '#ef4444', text: '#ffffff', label: 'Rosso' },
+    { id: 'green',  color: '#22c55e', text: '#ffffff', label: 'Verde' },
+    { id: 'yellow', color: '#eab308', text: '#1a1a1a', label: 'Giallo' },
+    { id: 'purple', color: '#a855f7', text: '#ffffff', label: 'Viola' },
+    { id: 'orange', color: '#f97316', text: '#ffffff', label: 'Arancio' },
+    { id: 'black',  color: '#1f2937', text: '#ffffff', label: 'Nero' },
+    { id: 'white',  color: '#f3f4f6', text: '#1a1a1a', label: 'Bianco' },
+  ];
+  const DEFAULT_HOME_COLOR = 'blue';
+  const DEFAULT_AWAY_COLOR = 'red';
 
   // ============================================================
   // STATE
@@ -45,6 +58,48 @@
   function clearState() {
     state = { match: null };
     localStorage.removeItem(STORAGE_KEY);
+  }
+
+  function archiveCurrentMatch() {
+    if (!state.match) return;
+    try {
+      const snapshot = {
+        savedAt: new Date().toISOString(),
+        match: state.match,
+      };
+      localStorage.setItem(RECENT_KEY, JSON.stringify(snapshot));
+    } catch (e) {
+      console.warn('Errore archiviazione partita:', e);
+    }
+  }
+
+  function getRecentSnapshot() {
+    try {
+      const raw = localStorage.getItem(RECENT_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.match) return parsed;
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+
+  function clearRecent() {
+    localStorage.removeItem(RECENT_KEY);
+  }
+
+  function colorById(id) {
+    return PALETTE.find((p) => p.id === id) || PALETTE[0];
+  }
+
+  function applyTeamColors() {
+    if (!state.match) return;
+    const home = colorById(state.match.home.color || DEFAULT_HOME_COLOR);
+    const away = colorById(state.match.away.color || DEFAULT_AWAY_COLOR);
+    const root = document.documentElement.style;
+    root.setProperty('--home', home.color);
+    root.setProperty('--home-text', home.text);
+    root.setProperty('--away', away.color);
+    root.setProperty('--away-text', away.text);
   }
 
   function uid() {
@@ -223,6 +278,23 @@
       banner.classList.add('hidden');
     }
 
+    // Recent match banner
+    const recentBanner = document.getElementById('recent-banner');
+    const recentInfo = document.getElementById('recent-info');
+    const snap = getRecentSnapshot();
+    if (snap && snap.match) {
+      const m = snap.match;
+      const score = (m.events || []).reduce((acc, ev) => {
+        if (ev.type === 'score') acc[ev.team] += ev.value;
+        return acc;
+      }, { home: 0, away: 0 });
+      const when = new Date(snap.savedAt).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+      recentInfo.textContent = `${m.home.name} ${score.home} - ${score.away} ${m.away.name} · salvata ${when}`;
+      recentBanner.classList.remove('hidden');
+    } else {
+      recentBanner.classList.add('hidden');
+    }
+
     // Init manual roster rows once
     ['home', 'away'].forEach((side) => {
       const c = document.getElementById(`manual-${side}-players`);
@@ -267,7 +339,11 @@
   }
 
   function showPreview(roster, sourceUrl) {
-    pendingRoster = { ...roster, sourceUrl };
+    pendingRoster = {
+      home: { ...roster.home, color: roster.home.color || DEFAULT_HOME_COLOR },
+      away: { ...roster.away, color: roster.away.color || DEFAULT_AWAY_COLOR },
+      sourceUrl,
+    };
     const preview = document.getElementById('preview');
     const content = document.getElementById('preview-content');
     content.innerHTML = '';
@@ -295,8 +371,39 @@
       }
       content.appendChild(div);
     });
+    renderColorPickers();
     preview.classList.remove('hidden');
     preview.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function renderColorPickers() {
+    const wrap = document.getElementById('color-pickers');
+    if (!pendingRoster) { wrap.innerHTML = ''; return; }
+    const sides = [
+      { id: 'home', label: 'Casa' },
+      { id: 'away', label: 'Ospite' },
+    ];
+    wrap.innerHTML = sides.map((side) => {
+      const team = pendingRoster[side.id];
+      const swatches = PALETTE.map((c) => {
+        const sel = team.color === c.id ? ' selected' : '';
+        return `<button type="button" class="color-swatch${sel}" data-side="${side.id}" data-color-id="${c.id}" style="background:${c.color}" aria-label="${c.label}"></button>`;
+      }).join('');
+      return `
+        <div class="color-picker">
+          <div class="color-picker-label">${side.label}<span class="team-name-preview">${escapeHtml(team.name)}</span></div>
+          <div class="color-swatches">${swatches}</div>
+        </div>
+      `;
+    }).join('');
+
+    wrap.querySelectorAll('.color-swatch').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const s = btn.dataset.side;
+        pendingRoster[s].color = btn.dataset.colorId;
+        renderColorPickers();
+      });
+    });
   }
 
   function startMatch() {
@@ -311,6 +418,7 @@
     };
     pendingRoster = null;
     saveState();
+    applyTeamColors();
     currentTab = 'home';
     showScreen('match');
     renderMatch();
@@ -356,6 +464,7 @@
     const m = state.match;
     const team = m[currentTab];
     const list = document.getElementById('players-list');
+    list.dataset.team = currentTab;
     list.innerHTML = '';
     team.players
       .slice()
@@ -589,6 +698,60 @@
   }
 
   // ============================================================
+  // EXPORT / IMPORT
+  // ============================================================
+  function buildExportPayload(match) {
+    return {
+      app: 'uisp-referto',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      match,
+    };
+  }
+
+  function downloadJson(filename, payload) {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
+  function safeFilenamePart(s) {
+    return String(s || '').replace(/[^a-zA-Z0-9-]+/g, '_').slice(0, 30);
+  }
+
+  function exportMatch(match) {
+    if (!match) return;
+    const payload = buildExportPayload(match);
+    const date = new Date().toISOString().slice(0, 10);
+    const fname = `referto-${safeFilenamePart(match.home.name)}-vs-${safeFilenamePart(match.away.name)}-${date}.json`;
+    downloadJson(fname, payload);
+  }
+
+  function importMatchFromFile(file, onResult) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        const match = data && data.match ? data.match : (data && data.events ? data : null);
+        if (!match || !match.home || !match.away || !Array.isArray(match.events)) {
+          throw new Error('Struttura non valida');
+        }
+        onResult(null, match);
+      } catch (e) {
+        onResult(e, null);
+      }
+    };
+    reader.onerror = () => onResult(new Error('Errore lettura file'), null);
+    reader.readAsText(file);
+  }
+
+  // ============================================================
   // UTILS
   // ============================================================
   function escapeHtml(s) {
@@ -663,13 +826,68 @@
     });
 
     document.getElementById('btn-resume').addEventListener('click', () => {
-      if (state.match) { showScreen('match'); renderMatch(); }
+      if (state.match) { applyTeamColors(); showScreen('match'); renderMatch(); }
     });
     document.getElementById('btn-discard').addEventListener('click', () => {
-      if (confirm('Scartare la partita in corso? I dati saranno persi.')) {
+      if (confirm('Scartare la partita in corso? Verrà archiviata in "Partita salvata".')) {
+        archiveCurrentMatch();
         clearState();
         renderSetup();
       }
+    });
+
+    document.getElementById('btn-recover').addEventListener('click', () => {
+      const snap = getRecentSnapshot();
+      if (!snap || !snap.match) return;
+      if (state.match && !confirm('Sostituire la partita corrente con quella salvata?')) return;
+      state.match = snap.match;
+      saveState();
+      applyTeamColors();
+      currentTab = 'home';
+      showScreen('match');
+      renderMatch();
+    });
+
+    document.getElementById('btn-export-recent').addEventListener('click', () => {
+      const snap = getRecentSnapshot();
+      if (snap && snap.match) exportMatch(snap.match);
+    });
+
+    document.getElementById('btn-delete-recent').addEventListener('click', () => {
+      if (confirm('Eliminare la partita salvata?')) {
+        clearRecent();
+        renderSetup();
+      }
+    });
+
+    // --- Import ---
+    const importInput = document.getElementById('file-import');
+    document.getElementById('btn-import').addEventListener('click', () => importInput.click());
+    importInput.addEventListener('change', () => {
+      const file = importInput.files && importInput.files[0];
+      if (!file) return;
+      const status = document.getElementById('import-status');
+      status.textContent = 'Importazione in corso…';
+      status.className = 'status info';
+      importMatchFromFile(file, (err, match) => {
+        importInput.value = '';
+        if (err) {
+          status.textContent = 'File non valido: ' + err.message;
+          status.className = 'status error';
+          return;
+        }
+        if (state.match && !confirm('Sostituire la partita corrente con quella importata?')) {
+          status.textContent = '';
+          return;
+        }
+        state.match = match;
+        saveState();
+        applyTeamColors();
+        currentTab = 'home';
+        status.textContent = '';
+        showScreen('match');
+        renderMatch();
+      });
     });
 
     // --- Match ---
@@ -706,11 +924,16 @@
     });
 
     document.getElementById('btn-end-match').addEventListener('click', () => {
-      if (confirm('Terminare la partita? Tutti i dati saranno cancellati.')) {
+      if (confirm('Terminare la partita? Verrà archiviata in "Partita salvata" sulla home.')) {
+        archiveCurrentMatch();
         clearState();
         showScreen('setup');
         renderSetup();
       }
+    });
+
+    document.getElementById('btn-export').addEventListener('click', () => {
+      if (state.match) exportMatch(state.match);
     });
 
     // --- History ---
@@ -744,6 +967,7 @@
     loadState();
     bindEvents();
     if (state.match) {
+      applyTeamColors();
       showScreen('match');
       renderMatch();
     } else {

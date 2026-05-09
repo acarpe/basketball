@@ -11,7 +11,9 @@
   --success: #22c55e;
   --warning: #eab308;
   --home: #3b82f6;
+  --home-text: #ffffff;
   --away: #ef4444;
+  --away-text: #ffffff;
   --radius: 12px;
   --radius-sm: 8px;
   --gap: 12px;
@@ -147,6 +149,33 @@ code {
 }
 .preview-team .pill .num { color: var(--primary); font-weight: 700; margin-right: 6px; }
 
+/* ====== Color picker ====== */
+.color-picker { margin-top: 14px; }
+.color-picker-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.color-picker-label .team-name-preview { color: var(--text); margin-left: 4px; font-weight: 600; }
+.color-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.color-swatch {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  transition: transform 0.05s;
+}
+.color-swatch:active { transform: scale(0.95); }
+.color-swatch.selected {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--primary);
+}
+
 /* ====== Match header (scoreboard + tabs sticky together) ====== */
 .match-header {
   position: sticky;
@@ -178,6 +207,8 @@ code {
 }
 .team-score[data-team="home"] .team-name { color: var(--home); }
 .team-score[data-team="away"] .team-name { color: var(--away); }
+.team-score[data-team="home"] .score { color: var(--home); }
+.team-score[data-team="away"] .score { color: var(--away); }
 .team-score .score { font-size: 2.6rem; font-weight: 800; line-height: 1; margin: 2px 0 4px; font-variant-numeric: tabular-nums; }
 .team-score .meta { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
 .bonus-pill, .to-pill {
@@ -220,13 +251,25 @@ code {
   font-family: inherit;
 }
 .tab.active { color: var(--text); border-bottom-color: var(--primary); }
+.tab[data-tab="home"].active { border-bottom-color: var(--home); color: var(--home); }
+.tab[data-tab="away"].active { border-bottom-color: var(--away); color: var(--away); }
 
 /* ====== Actions row ====== */
 .actions-row { margin-bottom: 10px; }
 .actions-row .btn { flex: 1 1 calc(50% - 4px); min-width: 0; padding: 10px 6px; font-size: 0.85rem; }
 
 /* ====== Players list ====== */
-.players-list { display: flex; flex-direction: column; gap: 8px; }
+.players-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  --team-color: var(--home);
+  --team-text: var(--home-text);
+}
+.players-list[data-team="away"] {
+  --team-color: var(--away);
+  --team-text: var(--away-text);
+}
 .player-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -243,8 +286,8 @@ code {
 .player-card:active { background: var(--surface-2); }
 .player-card.fouled-out { opacity: 0.55; border-color: var(--danger); }
 .player-card .num {
-  background: var(--primary);
-  color: white;
+  background: var(--team-color, var(--primary));
+  color: var(--team-text, white);
   font-weight: 800;
   font-size: 1.2rem;
   width: 50px;
@@ -254,11 +297,12 @@ code {
   align-items: center;
   justify-content: center;
   font-variant-numeric: tabular-nums;
+  border: 2px solid var(--border);
 }
 .player-card .info .name { font-weight: 600; line-height: 1.2; }
 .player-card .info .first { font-size: 0.8rem; color: var(--muted); line-height: 1.2; }
 .player-card .stats { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 0.78rem; }
-.player-card .stats .pts { font-size: 1.05rem; font-weight: 800; color: var(--primary); }
+.player-card .stats .pts { font-size: 1.05rem; font-weight: 800; color: var(--team-color, var(--primary)); }
 .player-card .stats .fouls { color: var(--muted); }
 .player-card .stats .fouls.warn { color: var(--warning); }
 .player-card .stats .fouls.out { color: var(--danger); font-weight: 700; }

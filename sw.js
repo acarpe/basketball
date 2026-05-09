@@ -1,6 +1,6 @@
 // Service worker for offline-capable PWA. Cache-first per gli asset locali,
 // network-first con fallback per HTML.
-const CACHE = 'uisp-referto-v1';
+const CACHE = 'uisp-referto-v2';
 const ASSETS = [
   './',
   './index.html',

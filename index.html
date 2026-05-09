@@ -31,6 +31,26 @@
           </div>
         </div>
 
+        <div id="recent-banner" class="card hidden">
+          <p><strong>Partita salvata</strong></p>
+          <p id="recent-info" class="muted small"></p>
+          <div class="row gap">
+            <button class="btn primary" id="btn-recover">Riapri</button>
+            <button class="btn ghost" id="btn-export-recent">Esporta</button>
+            <button class="btn danger ghost" id="btn-delete-recent">Elimina</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Importa partita salvata</h2>
+          <p class="muted small">Hai un file <code>.json</code> esportato in precedenza? Caricalo per riprendere.</p>
+          <div class="row gap">
+            <button class="btn ghost" id="btn-import">Importa file JSON</button>
+          </div>
+          <input type="file" id="file-import" accept="application/json,.json" hidden />
+          <p id="import-status" class="status" aria-live="polite"></p>
+        </div>
+
         <div class="card">
           <h2>1. Carica il roster</h2>
           <p class="muted small">Incolla il link UISP della partita (es. <code>https://gestionalepallacanestro.uisp.it/App/Partita?id=18564</code>).</p>
@@ -70,8 +90,9 @@
         </div>
 
         <div id="preview" class="card hidden">
-          <h2>2. Conferma roster</h2>
+          <h2>2. Conferma roster e colori</h2>
           <div id="preview-content"></div>
+          <div id="color-pickers"></div>
           <div class="row gap">
             <button class="btn primary" id="btn-start-match">Inizia partita</button>
             <button class="btn ghost" id="btn-cancel-preview">Annulla</button>
@@ -123,6 +144,10 @@
         </div>
 
         <div id="players-list" class="players-list" aria-live="polite"></div>
+
+        <div class="row gap mt">
+          <button class="btn ghost" id="btn-export">Esporta JSON</button>
+        </div>
 
         <button class="btn danger ghost mt block" id="btn-end-match">Termina e nuova partita</button>
       </div>
