@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0b0d12" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Referto UISP</title>
+</head>
+<body>
+  <main id="app">
+
+    <!-- ============== SETUP SCREEN ============== -->
+    <section id="screen-setup" class="screen">
+      <header class="topbar">
+        <h1>Referto UISP</h1>
+      </header>
+
+      <div class="container">
+        <div id="resume-banner" class="card hidden">
+          <p><strong>Partita in corso</strong></p>
+          <p id="resume-info" class="muted small"></p>
+          <div class="row gap">
+            <button class="btn primary" id="btn-resume">Riprendi</button>
+            <button class="btn danger ghost" id="btn-discard">Scarta</button>
+          </div>
+        </div>
+
+        <div id="recent-banner" class="card hidden">
+          <p><strong>Partita salvata</strong></p>
+          <p id="recent-info" class="muted small"></p>
+          <div class="row gap">
+            <button class="btn primary" id="btn-recover">Riapri</button>
+            <button class="btn ghost" id="btn-export-recent">Esporta</button>
+            <button class="btn danger ghost" id="btn-delete-recent">Elimina</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Importa partita salvata</h2>
+          <p class="muted small">Hai un file <code>.json</code> esportato in precedenza? Caricalo per riprendere.</p>
+          <div class="row gap">
+            <button class="btn ghost" id="btn-import">Importa file JSON</button>
+          </div>
+          <input type="file" id="file-import" accept="application/json,.json" hidden />
+          <p id="import-status" class="status" aria-live="polite"></p>
+        </div>
+
+        <div class="card">
+          <h2>1. Carica il roster</h2>
+          <p class="muted small">Incolla il link UISP della partita (es. <code>https://gestionalepallacanestro.uisp.it/App/Partita?id=18564</code>).</p>
+          <input type="url" id="uisp-url" placeholder="https://gestionalepallacanestro.uisp.it/App/Partita?id=..." inputmode="url" autocomplete="off" />
+          <div class="row gap">
+            <button class="btn primary" id="btn-fetch-url">Importa da URL</button>
+            <button class="btn ghost" id="btn-toggle-paste">Incolla HTML</button>
+            <button class="btn ghost" id="btn-toggle-manual">Manuale</button>
+          </div>
+          <p id="fetch-status" class="status" aria-live="polite"></p>
+
+          <div id="paste-area" class="hidden mt">
+            <p class="muted small">
+              Apri la pagina UISP nel browser, fai click destro &rarr; "Visualizza sorgente pagina" (su iPhone usa <em>view-source:</em> davanti all'URL),
+              copia tutto e incolla qui sotto.
+            </p>
+            <textarea id="paste-html" rows="6" placeholder="<html>...</html>"></textarea>
+            <button class="btn primary" id="btn-parse-paste">Importa HTML incollato</button>
+          </div>
+
+          <div id="manual-area" class="hidden mt">
+            <p class="muted small">Inserisci a mano nome squadra e giocatori (numero + cognome). Aggiungi righe quante ne servono.</p>
+            <div class="manual-team">
+              <label>Squadra casa</label>
+              <input type="text" id="manual-home-name" placeholder="Nome squadra casa" />
+              <div id="manual-home-players" class="players-edit"></div>
+              <button class="btn ghost small" data-add="home">+ Giocatore</button>
+            </div>
+            <div class="manual-team mt">
+              <label>Squadra ospite</label>
+              <input type="text" id="manual-away-name" placeholder="Nome squadra ospite" />
+              <div id="manual-away-players" class="players-edit"></div>
+              <button class="btn ghost small" data-add="away">+ Giocatore</button>
+            </div>
+            <button class="btn primary mt" id="btn-manual-create">Crea partita</button>
+          </div>
+        </div>
+
+        <div id="preview" class="card hidden">
+          <h2>2. Conferma roster e colori</h2>
+          <div id="preview-content"></div>
+          <div id="color-pickers"></div>
+          <div class="row gap">
+            <button class="btn primary" id="btn-start-match">Inizia partita</button>
+            <button class="btn ghost" id="btn-cancel-preview">Annulla</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== MATCH SCREEN ============== -->
+    <section id="screen-match" class="screen hidden">
+      <div class="match-header">
+        <header class="scoreboard">
+          <div class="team-score" data-team="home">
+            <div class="team-name" id="sb-home-name">Casa</div>
+            <div class="score" id="sb-home-score">0</div>
+            <div class="meta">
+              <span class="bonus-pill" id="sb-home-bonus">Falli sq. 0</span>
+              <span class="to-pill" id="sb-home-to">TO 0</span>
+            </div>
+          </div>
+          <div class="period">
+            <div class="period-label">QUARTO</div>
+            <div class="period-value" id="sb-period">1</div>
+            <button class="btn ghost xsmall" id="btn-period-prev" aria-label="Quarto precedente">&lsaquo;</button>
+            <button class="btn ghost xsmall" id="btn-period-next" aria-label="Quarto successivo">&rsaquo;</button>
+          </div>
+          <div class="team-score" data-team="away">
+            <div class="team-name" id="sb-away-name">Ospite</div>
+            <div class="score" id="sb-away-score">0</div>
+            <div class="meta">
+              <span class="bonus-pill" id="sb-away-bonus">Falli sq. 0</span>
+              <span class="to-pill" id="sb-away-to">TO 0</span>
+            </div>
+          </div>
+        </header>
+
+        <nav class="tabs" role="tablist">
+          <button class="tab active" data-tab="home" role="tab">Casa</button>
+          <button class="tab" data-tab="away" role="tab">Ospite</button>
+        </nav>
+      </div>
+
+      <div class="container">
+        <div class="row gap actions-row">
+          <button class="btn ghost" id="btn-undo">&#8634; Annulla ultima</button>
+          <button class="btn ghost" id="btn-history">Cronologia</button>
+          <button class="btn ghost" id="btn-team-foul">+ Fallo squadra</button>
+          <button class="btn ghost" id="btn-timeout">+ Timeout</button>
+        </div>
+
+        <div id="players-list" class="players-list" aria-live="polite"></div>
+
+        <div class="row gap mt">
+          <button class="btn ghost" id="btn-summary">Riepilogo</button>
+          <button class="btn ghost" id="btn-export">Esporta JSON</button>
+        </div>
+
+        <button class="btn danger ghost mt block" id="btn-end-match">Termina e nuova partita</button>
+      </div>
+    </section>
+
+    <!-- ============== HISTORY SCREEN ============== -->
+    <section id="screen-history" class="screen hidden">
+      <header class="topbar">
+        <button class="btn ghost xsmall" id="btn-history-back">&lsaquo; Indietro</button>
+        <h1>Cronologia</h1>
+      </header>
+      <div class="container">
+        <div id="history-list" class="history-list"></div>
+      </div>
+    </section>
+
+    <!-- ============== SUMMARY SCREEN ============== -->
+    <section id="screen-summary" class="screen hidden">
+      <header class="topbar no-print">
+        <button class="btn ghost xsmall" id="btn-summary-back">&lsaquo; Indietro</button>
+        <h1>Riepilogo</h1>
+      </header>
+      <div class="container">
+        <div class="row gap no-print summary-actions">
+          <button class="btn primary" id="btn-print">Stampa / PDF</button>
+          <button class="btn ghost" id="btn-png">Salva PNG</button>
+        </div>
+        <p class="status no-print" id="png-status" aria-live="polite"></p>
+        <div id="summary-sheet" class="summary-sheet"></div>
+      </div>
+    </section>
+
+    <!-- ============== ACTION MODAL ============== -->
+    <div id="modal-action" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-content">
+        <div class="modal-header">
+          <strong id="modal-player-label">#</strong>
+          <button class="btn ghost xsmall" id="modal-close" aria-label="Chiudi">&times;</button>
+        </div>
+        <div class="modal-stats" id="modal-player-stats"></div>
+        <div class="action-grid">
+          <button class="action-btn score-3" data-action="score" data-value="3">+3</button>
+          <button class="action-btn score-2" data-action="score" data-value="2">+2</button>
+          <button class="action-btn score-1" data-action="score" data-value="1">TL +1</button>
+          <button class="action-btn foul" data-action="foul">Fallo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== EDIT EVENT MODAL ============== -->
+    <div id="modal-edit" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-content">
+        <div class="modal-header">
+          <strong id="edit-title">Modifica evento</strong>
+          <button class="btn ghost xsmall" id="edit-close" aria-label="Chiudi">&times;</button>
+        </div>
+        <div id="edit-body"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="vendor/html2canvas.min.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
