@@ -111,7 +111,17 @@
   // ============================================================
   function parseUispHtml(html) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    // Cards with team rosters
+    // Try old format (match detail with stats columns)
+    let teams = parseOldFormat(doc);
+    if (!teams || teams.length < 2) {
+      // Fall back to new format (convocati, 2-column table)
+      teams = parseNewFormat(doc);
+    }
+    if (!teams || teams.length < 2) return null;
+    return { home: teams[0], away: teams[1] };
+  }
+
+  function parseOldFormat(doc) {
     const cards = doc.querySelectorAll('.card.mb-2');
     const teams = [];
     cards.forEach((card) => {
@@ -125,12 +135,10 @@
       tbody.querySelectorAll('tr').forEach((tr) => {
         const tds = tr.querySelectorAll('td');
         if (tds.length === 0) return;
-        // Skip totals row (bg-dark)
         if (tr.classList.contains('bg-dark')) return;
         const firstSpan = tds[0].querySelector('span');
         const tag = (firstSpan ? firstSpan.textContent : tds[0].textContent || '').trim();
         if (!tag) return;
-        // Player row: 6 cells, numeric tag
         if (/^\d+$/.test(tag) && tds.length >= 2) {
           const numEl = tds[1];
           const lastEl = numEl.querySelector('b');
@@ -140,7 +148,6 @@
           const year = (smalls[1] ? smalls[1].textContent : '').trim();
           players.push({ number: parseInt(tag, 10), lastName, firstName, year });
         } else if (tag === 'ALL' && tds.length >= 2) {
-          // Coach
           const lastEl = tds[1].querySelector('b');
           const small = tds[1].querySelector('small');
           coach = {
@@ -148,17 +155,55 @@
             firstName: (small ? small.textContent : '').trim(),
           };
         }
-        // DIR rows are silently skipped
       });
       if (name && players.length > 0) {
         teams.push({ name, players, coach });
       }
     });
-    if (teams.length < 2) return null;
-    return {
-      home: teams[0],
-      away: teams[1],
-    };
+    return teams;
+  }
+
+  function parseNewFormat(doc) {
+    const cards = doc.querySelectorAll('.card.card-flush');
+    const teams = [];
+    cards.forEach((card) => {
+      const nameEl = card.querySelector('.card-label');
+      if (!nameEl) return;
+      const name = (nameEl.textContent || '').trim();
+      const tbody = card.querySelector('tbody');
+      if (!tbody) return;
+      const players = [];
+      tbody.querySelectorAll('tr').forEach((tr) => {
+        const tds = tr.querySelectorAll('td');
+        if (tds.length < 2) return;
+        const numText = (tds[0].textContent || '').trim();
+        if (!/^\d+$/.test(numText)) return;
+        const nameClone = tds[1].cloneNode(true);
+        nameClone.querySelectorAll('.badge').forEach((b) => b.remove());
+        const fullName = (nameClone.textContent || '').trim().replace(/\s+/g, ' ');
+        players.push({
+          number: parseInt(numText, 10),
+          lastName: fullName,
+          firstName: '',
+          year: '',
+        });
+      });
+      let coach = null;
+      card.querySelectorAll('.d-flex.flex-stack').forEach((s) => {
+        const badge = s.querySelector('.badge');
+        if (!badge) return;
+        const title = (badge.getAttribute('title') || '').toLowerCase();
+        if (title.includes('allenatore')) {
+          const nameSpan = s.querySelector('span.text-gray-800') || s.querySelector('span');
+          const n = nameSpan ? nameSpan.textContent.trim() : '';
+          if (n) coach = { lastName: n, firstName: '' };
+        }
+      });
+      if (name && players.length > 0) {
+        teams.push({ name, players, coach });
+      }
+    });
+    return teams;
   }
 
   async function fetchViaProxies(url) {
