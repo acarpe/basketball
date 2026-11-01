@@ -53,22 +53,37 @@
 
         <div class="card">
           <h2>1. Carica il roster</h2>
-          <p class="muted small">Incolla il link UISP della partita (es. <code>https://gestionalepallacanestro.uisp.it/Milano/66/160/1/2/7166</code> oppure il vecchio formato <code>/App/Partita?id=...</code>).</p>
-          <input type="url" id="uisp-url" placeholder="https://gestionalepallacanestro.uisp.it/..." inputmode="url" autocomplete="off" />
+          <p class="muted small">
+            Sulla pagina UISP della partita in Safari tocca <strong>Condividi &rarr; Referto UISP</strong>,
+            poi torna qui e tocca il pulsante qui sotto.
+          </p>
           <div class="row gap">
-            <button class="btn primary" id="btn-fetch-url">Importa da URL</button>
-            <button class="btn ghost" id="btn-toggle-paste">Incolla HTML</button>
+            <button class="btn primary" id="btn-paste-clipboard">Incolla roster dagli appunti</button>
+            <button class="btn ghost" id="btn-toggle-paste">Incolla a mano</button>
             <button class="btn ghost" id="btn-toggle-manual">Manuale</button>
           </div>
           <p id="fetch-status" class="status" aria-live="polite"></p>
 
-          <div id="paste-area" class="hidden mt">
+          <details class="mt shortcut-help">
+            <summary>Come creare il Comando rapido "Referto UISP" (una volta sola)</summary>
+            <ol class="small">
+              <li>Apri l'app <strong>Comandi</strong> e tocca <strong>+</strong>. Rinomina il comando in <strong>Referto UISP</strong>.</li>
+              <li>Apri i dettagli del comando (&#9432; o il menu sul nome) e attiva <strong>Mostra nel foglio di condivisione</strong>. Come input accetta <em>URL</em> e <em>Pagine web Safari</em>; in "Se non c'è input" scegli <strong>Usa appunti</strong>.</li>
+              <li>Aggiungi l'azione <strong>Ottieni contenuti dell'URL</strong> e come URL usa la variabile <strong>Input comando</strong>.</li>
+              <li>Aggiungi l'azione <strong>Ottieni testo da input</strong>.</li>
+              <li>Aggiungi l'azione <strong>Copia negli appunti</strong>.</li>
+            </ol>
             <p class="muted small">
-              Apri la pagina UISP nel browser, fai click destro &rarr; "Visualizza sorgente pagina" (su iPhone usa <em>view-source:</em> davanti all'URL),
-              copia tutto e incolla qui sotto.
+              In alternativa puoi copiare il link della partita e avviare il comando dall'app Comandi:
+              userà il link negli appunti. Funziona anche aprire la pagina UISP, tenere premuto,
+              <em>Seleziona tutto</em> e <em>Copia</em>.
             </p>
-            <textarea id="paste-html" rows="6" placeholder="<html>...</html>"></textarea>
-            <button class="btn primary" id="btn-parse-paste">Importa HTML incollato</button>
+          </details>
+
+          <div id="paste-area" class="hidden mt">
+            <p class="muted small">Incolla qui il testo o l'HTML della pagina UISP.</p>
+            <textarea id="paste-html" rows="6" placeholder="VISMARA U17 Convocati&#10;3  PAGCU PAX LAURENCE&#10;..."></textarea>
+            <button class="btn primary" id="btn-parse-paste">Importa testo incollato</button>
           </div>
 
           <div id="manual-area" class="hidden mt">
