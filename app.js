@@ -9,10 +9,6 @@
   const MAX_PERIODS = 4;
   const FOULS_BONUS = 5;            // 5° fallo squadra in periodo => bonus
   const FOULS_OUT = 5;              // 5° fallo individuale => fuori
-  const CORS_PROXIES = [
-    (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  ];
   const PALETTE = [
     { id: 'blue',   color: '#3b82f6', text: '#ffffff', label: 'Blu' },
     { id: 'red',    color: '#ef4444', text: '#ffffff', label: 'Rosso' },
@@ -206,20 +202,79 @@
     return teams;
   }
 
-  async function fetchViaProxies(url) {
-    let lastErr = null;
-    for (const buildProxyUrl of CORS_PROXIES) {
-      try {
-        const resp = await fetch(buildProxyUrl(url), { method: 'GET' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const html = await resp.text();
-        if (html && html.length > 200) return html;
-        throw new Error('Risposta vuota');
-      } catch (e) {
-        lastErr = e;
+  function cleanPlayerName(s) {
+    return s.replace(/\s+[CV]$/, '').replace(/\s+/g, ' ').trim();
+  }
+
+  // Visible text of a UISP "convocati" page (what Shortcuts or Select all + Copy produce).
+  function parseUispText(text) {
+    const lines = String(text || '')
+      .split(/\r?\n/)
+      .map((l) => l.replace(/ /g, ' ').trim())
+      .filter(Boolean);
+    const teams = [];
+    let cur = null;
+    let pendingNum = null;
+    let lastLooseName = null;
+    const addPlayer = (num, name) => {
+      const n = cleanPlayerName(name);
+      if (n) cur.players.push({ number: parseInt(num, 10), lastName: n, firstName: '', year: '' });
+    };
+    for (const line of lines) {
+      const head = line.match(/^(.+?)\s+Convocati$/i);
+      if (head) {
+        cur = { name: head[1].trim(), players: [], coach: null };
+        teams.push(cur);
+        pendingNum = null;
+        lastLooseName = null;
+        continue;
       }
+      if (!cur) continue;
+      if (/^#?\s*Giocatore$/i.test(line) || line === '#') continue;
+      if (/^[CV]$/.test(line)) continue;
+      // Staff names are followed by a role letter on its own line: A = allenatore, D = dirigente
+      if (line === 'A') {
+        if (lastLooseName && !cur.coach) cur.coach = { lastName: lastLooseName, firstName: '' };
+        lastLooseName = null;
+        continue;
+      }
+      if (line === 'D') { lastLooseName = null; continue; }
+      const m = line.match(/^(\d{1,3})\s+(.+)$/);
+      if (m) { addPlayer(m[1], m[2]); pendingNum = null; lastLooseName = null; continue; }
+      if (/^\d{1,3}$/.test(line)) { pendingNum = line; continue; }
+      if (pendingNum !== null) { addPlayer(pendingNum, line); pendingNum = null; continue; }
+      lastLooseName = line;
     }
-    throw lastErr || new Error('Tutti i proxy hanno fallito');
+    const valid = teams.filter((t) => t.name && t.players.length > 0);
+    if (valid.length < 2) return null;
+    return { home: valid[0], away: valid[1] };
+  }
+
+  function parseRoster(input) {
+    if (!input) return null;
+    if (/<\s*(html|body|table|div)\b/i.test(input)) {
+      const fromHtml = parseUispHtml(input);
+      if (fromHtml) return fromHtml;
+      const doc = new DOMParser().parseFromString(input, 'text/html');
+      return parseUispText(doc.body ? doc.body.innerText || doc.body.textContent : '');
+    }
+    return parseUispText(input);
+  }
+
+  async function readClipboard() {
+    const out = { html: '', text: '' };
+    if (navigator.clipboard && navigator.clipboard.read) {
+      try {
+        const items = await navigator.clipboard.read();
+        for (const it of items) {
+          if (!out.html && it.types.includes('text/html')) out.html = await (await it.getType('text/html')).text();
+          if (!out.text && it.types.includes('text/plain')) out.text = await (await it.getType('text/plain')).text();
+        }
+        if (out.html || out.text) return out;
+      } catch (e) { /* fall back to readText */ }
+    }
+    out.text = await navigator.clipboard.readText();
+    return out;
   }
 
   // ============================================================
@@ -984,22 +1039,26 @@
   // ============================================================
   function bindEvents() {
     // --- Setup ---
-    document.getElementById('btn-fetch-url').addEventListener('click', async () => {
-      const url = document.getElementById('uisp-url').value.trim();
-      if (!url) { setStatus('Inserisci un URL.', 'error'); return; }
-      setStatus('Importazione in corso…', 'info');
+    document.getElementById('btn-paste-clipboard').addEventListener('click', async () => {
+      let clip;
       try {
-        const html = await fetchViaProxies(url);
-        const roster = parseUispHtml(html);
-        if (!roster) { setStatus('Roster non trovato nella pagina.', 'error'); return; }
-        setStatus(`Trovate squadre: ${roster.home.name} vs ${roster.away.name}.`, 'success');
-        showPreview(roster, url);
+        clip = await readClipboard();
       } catch (e) {
-        console.error(e);
-        setStatus(
-          'Impossibile recuperare la pagina via proxy. Prova "Incolla HTML".',
-          'error'
-        );
+        setStatus('Non riesco a leggere gli appunti. Usa "Incolla a mano".', 'error');
+        return;
+      }
+      const raw = (clip.html || clip.text || '').trim();
+      if (!raw) { setStatus('Gli appunti sono vuoti.', 'error'); return; }
+      const roster = (clip.html && parseRoster(clip.html)) || parseRoster(clip.text);
+      if (roster) {
+        setStatus(`Trovate squadre: ${roster.home.name} vs ${roster.away.name}.`, 'success');
+        showPreview(roster, null);
+        return;
+      }
+      if (/^https?:\/\/\S+$/.test((clip.text || '').trim())) {
+        setStatus('Negli appunti c\'è solo il link: avvia il Comando rapido "Referto UISP" e poi riprova.', 'error');
+      } else {
+        setStatus('Roster non trovato negli appunti.', 'error');
       }
     });
 
@@ -1013,13 +1072,12 @@
     });
 
     document.getElementById('btn-parse-paste').addEventListener('click', () => {
-      const html = document.getElementById('paste-html').value;
-      if (!html.trim()) { setStatus('Incolla l\'HTML completo.', 'error'); return; }
-      const roster = parseUispHtml(html);
-      if (!roster) { setStatus('Impossibile estrarre il roster da questo HTML.', 'error'); return; }
-      const url = document.getElementById('uisp-url').value.trim() || null;
+      const input = document.getElementById('paste-html').value;
+      if (!input.trim()) { setStatus('Incolla il testo della pagina.', 'error'); return; }
+      const roster = parseRoster(input);
+      if (!roster) { setStatus('Impossibile estrarre il roster dal testo incollato.', 'error'); return; }
       setStatus(`Trovate squadre: ${roster.home.name} vs ${roster.away.name}.`, 'success');
-      showPreview(roster, url);
+      showPreview(roster, null);
     });
 
     document.querySelectorAll('[data-add]').forEach((btn) => {
